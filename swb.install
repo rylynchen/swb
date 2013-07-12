@@ -1,0 +1,155 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function swb_install() {
+  field_cache_clear();
+  // field bind
+  $field_bind_name = 'field_swb_bind';
+  $field_bind = field_info_field($field_bind_name);
+  if (empty($field_bind)) {
+    $field_bind = array(
+      'field_name' => $field_bind_name,
+      'type' => 'list_boolean',
+      'cardinality' => 1,
+      'settings' => array(
+        'allowed_values' => array(0 => 'No', 1 => 'Yes'),
+      ),
+    );
+    $field_bind = field_create_field($field_bind);
+  }
+  $instance_bind = field_info_instance('user', $field_bind_name, 'user');
+  if (empty($instance_bind)) {
+    $instance_bind = array(
+      'bundle' => 'user', 
+      'entity_type' => 'user', 
+      'default_value' => array(array('value' => 0)),
+      'deleted' => '0',
+      'description' => '',
+      'field_name' => $field_bind_name, 
+      'label' => 'Sinaweibo Bind', 
+      'required' => 0,
+    );
+    $instance_bind = field_create_instance($instance_bind);
+  }
+  // field weibo_uid
+  $field_weibo_name_name = 'field_swb_name';
+  $field_weibo_name = field_info_field($field_weibo_name_name);
+  if (empty($field_weibo_name)) {
+    $field_weibo_name = array(
+      'field_name' => $field_weibo_name_name,
+      'type' => 'text',
+      'cardinality' => 1,
+    );
+    $field_weibo_name = field_create_field($field_weibo_name);
+  }
+  $instance_weibo_name = field_info_instance('user', $field_weibo_name_name, 'user');
+  if (empty($instance_weibo_name)) {
+    $instance_weibo_name = array(
+      'bundle' => 'user', 
+      'entity_type' => 'user', 
+      'deleted' => '0',
+      'description' => '',
+      'field_name' => $field_weibo_name_name, 
+      'label' => 'Sinaweibo Name', 
+      'required' => 0,
+    );
+    $instance_weibo_name = field_create_instance($instance_weibo_name);
+  }  
+  // field weibo_uid
+  $field_weibo_uid_name = 'field_swb_uid';
+  $field_weibo_uid = field_info_field($field_weibo_uid_name);
+  if (empty($field_weibo_uid)) {
+    $field_weibo_uid = array(
+      'field_name' => $field_weibo_uid_name,
+      'type' => 'text',
+      'cardinality' => 1,
+    );
+    $field_weibo_uid = field_create_field($field_weibo_uid);
+  }
+  $instance_weibo_uid = field_info_instance('user', $field_weibo_uid_name, 'user');
+  if (empty($instance_weibo_uid)) {
+    $instance_weibo_uid = array(
+      'bundle' => 'user', 
+      'entity_type' => 'user', 
+      'deleted' => '0',
+      'description' => '',
+      'field_name' => $field_weibo_uid_name, 
+      'label' => 'Sinaweibo Uid', 
+      'required' => 0,
+    );
+    $instance_weibo_uid = field_create_instance($instance_weibo_uid);
+  }
+  // field oauth_token
+  $field_oauth_token_name = 'field_swb_oauth_token';
+  $field_oauth_token = field_info_field($field_oauth_token_name);
+  if (empty($field_oauth_token)) {
+    $field_oauth_token = array(
+      'field_name' => $field_oauth_token_name,
+      'type' => 'text',
+      'cardinality' => 1,
+    );
+    $field_oauth_token = field_create_field($field_oauth_token);
+  }
+  $instance_oauth_token = field_info_instance('user', $field_oauth_token_name, 'user');
+  if (empty($instance_oauth_token)) {
+    $instance_oauth_token = array(
+      'bundle' => 'user', 
+      'entity_type' => 'user', 
+      'deleted' => '0',
+      'description' => '',
+      'field_name' => $field_oauth_token_name, 
+      'label' => 'Sinaweibo Oauth Token', 
+      'required' => 0,
+    );
+    $instance_oauth_token = field_create_instance($instance_oauth_token);
+  }  
+  drupal_set_message(t('You need to do some '.l(t('config'), 'admin/config/people/sinaweibo_profile').' for Sinaweibo Profile module.'));
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function swb_uninstall() {
+  $field_bind_name = 'field_swb_bind';
+  $instance_bind = field_info_instance('user', $field_bind_name, 'user');
+  if (!empty($instance_bind)) {
+    field_delete_instance($instance_bind);
+  }
+  $field_bind = field_info_field($field_bind_name);
+  if ($field_bind) {
+    field_delete_field($field_bind);
+  }
+
+  $field_weibo_name_name = 'field_swb_name';
+  $instance_weibo_name = field_info_instance('user', $field_weibo_name_name, 'user');
+  if (!empty($instance_weibo_name)) {
+    field_delete_instance($instance_weibo_name);
+  }
+  $field_weibo_name = field_info_field($field_weibo_name_name);
+  if ($field_weibo_name) {
+    field_delete_field($field_weibo_name);
+  }
+
+  $field_weibo_uid_name = 'field_swb_uid';
+  $instance_weibo_uid = field_info_instance('user', $field_weibo_uid_name, 'user');
+  if (!empty($instance_weibo_uid)) {
+    field_delete_instance($instance_weibo_uid);
+  }
+  $field_weibo_uid = field_info_field($field_weibo_uid_name);
+  if ($field_weibo_uid) {
+    field_delete_field($field_weibo_uid);
+  }
+
+  $field_oauth_token_name = 'field_swb_oauth_token';
+  $instance_oauth_token = field_info_instance('user', $field_oauth_token_name, 'user');
+  if (!empty($instance_oauth_token)) {
+    field_delete_instance($instance_oauth_token);
+  }
+  $field_oauth_token = field_info_field($field_oauth_token_name);
+  if ($field_oauth_token) {
+    field_delete_field($field_oauth_token);
+  }
+  variable_del('swb_settings');
+}

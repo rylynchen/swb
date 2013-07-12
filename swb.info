@@ -1,0 +1,6 @@
+name = Swb
+description = Sina Weibo module.
+package = authentication
+core = 7.x
+configure = admin/config/people/swb
+dependencies[] = entity

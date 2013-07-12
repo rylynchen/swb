@@ -1,0 +1,189 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function swb_menu() {
+  $items = array();
+  $items['admin/config/people/swb'] = array(
+    'title' => t('Sina Weibo Bind Setting'),
+    'description' => 'Configure required settings for Sina Weibo',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('swb_settings_form'),
+    'access arguments' => array('administer sinaweibo'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'swb.admin.inc',
+  );
+  $items['user/%user/swb'] = array(
+    'title' => t('新浪微博账号绑定'),
+    'page callback' => 'swb_page',
+    'page arguments' => array(1),
+    'access callback' => 'swb_access',
+    'access arguments' => array('view', 1),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'swb.pages.inc',
+  );
+  $items['user/%user/swb/bind/redirect'] = array(
+    'page callback' => 'swb_bind_redirect',
+    'page arguments' => array(1),
+    'access callback' => 'swb_access',
+    'access arguments' => array('bind', 1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/swb/bind/callback'] = array(
+    'page callback' => 'swb_bind_auth_callback',
+    'page arguments' => array(1),
+    'access callback' => 'swb_access',
+    'access arguments' => array('bind_callback', 1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/swb/delete'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('swb_delete_confirm_form', 1),
+    'access callback' => 'swb_access',
+    'access arguments' => array('delete', 1),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'swb.pages.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function swb_permission() {
+  return array(
+    'administer sinaweibo' => array(
+      'title' => t('Administer Sina Weibo'),
+      'description' => t('Access to administer sinaweibo.'),
+    ),
+  );
+}
+
+/**
+ * Swb access handler.
+ *
+ * @param $type
+ *
+ * @param $account
+ */
+function swb_access($type, $account) {
+  // only authenticated user
+  if (!user_is_logged_in()) {
+    return FALSE;
+  }
+
+  global $user;
+
+  // only self, except administrator
+  if (!($user->uid == 1 || $user->uid == $account->uid)) {
+    return FALSE;
+  }
+
+  // system not config key and secret
+  $settings = swb_settings();
+  if (empty($settings->key) || empty($settings->secret)) {
+    watchdog('swb', '[SWB_00] Sina weibo bind denied, system not config key and secret, please '.l(t('config'), 'admin/config/people/swb').'.', array(), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  if (in_array($type, array('view', 'edit', 'bind', 'bind_callback'))) {
+    return TRUE;
+  }
+  elseif ($type == 'delete') {
+    $account_wrapper = entity_metadata_wrapper('user', $account);
+    return (boolean) $account_wrapper->field_swb_bind->value();
+  }
+  else{
+    return FALSE;
+  }
+}
+
+/**
+ * Swb settings.
+ */
+function swb_settings() {
+  $settings = variable_get('swb_settings', NULL);
+  return $settings ? unserialize($settings) : swb_default_settings();
+}
+
+/**
+ * Swb default settings.
+ */
+function swb_default_settings() {
+  $settings = new stdClass();
+  $settings->key = '';
+  $settings->secret = '';
+  return $settings;
+}
+
+/**
+ * Swb bind action redirect.
+ *
+ * @param $account
+ */
+function swb_bind_redirect($account) {
+  global $base_url;
+  module_load_include('php', 'swb', 'saetv2.ex.class');
+  $settings = swb_settings();
+  $o = new SaeTOAuthV2($settings->key, $settings->secret);
+  $aurl = $o->getAuthorizeURL($base_url . '/user/'.$account->uid.'/swb/bind/callback');
+  drupal_goto($aurl);
+}
+
+/**
+ * Swb bind action callback.
+ *
+ * @param $account
+ */
+function swb_bind_auth_callback($account) {
+  module_load_include('php', 'swb', 'saetv2.ex.class');
+  $settings = swb_settings();
+  $key = variable_get('weibo_consumer_key', '');
+  $secret = variable_get('weibo_consumer_secret', '');
+  if (isset($_REQUEST['code']) && $_REQUEST['code']) {
+    global $base_url;
+    $o = new SaeTOAuthV2($settings->key, $settings->secret);
+    $keys = array();
+    $keys['code'] = $_REQUEST['code'];
+    $keys['redirect_uri'] = $base_url . '/user/'.$account->uid.'/swb/bind/callback';
+    try {
+      $token = $o->getAccessToken( 'code', $keys ) ;
+    } catch (OAuthException $e) {
+    }
+    if ($token) {
+      $_SESSION['weibooauth_token'] = $token;
+      $weibo_uid = $_SESSION['weibooauth_token']['uid'];
+    }
+    swb_bind($account);
+    drupal_goto('user/'.$account->uid.'/swb');
+  }
+}
+
+/**
+ * Connect the account with Sina Weibo.
+ *
+ * @param $account
+ */
+function swb_bind($account) {
+  if (isset($_SESSION['weibooauth_token'])) {
+    module_load_include('php', 'swb', 'saetv2.ex.class');
+    $settings = swb_settings();
+    $c = new SaeTClientV2($settings->key, $settings->secret, $_SESSION['weibooauth_token']['access_token']);
+    $uid_get = $c->get_uid();
+    $weibo_uid = @$uid_get['uid'];
+    if(!$weibo_uid) {
+      // get user info fail
+      watchdog('swb', '[SWB_02] Sina oauth bind fail, reason: get user weibo info fail, uid:%uid', array('%uid' => $account->uid), WATCHDOG_ERROR);
+      drupal_set_message(t('绑定新浪微博账号失败，系统错误[SWB_02]，请联系管理人员。'), 'error');
+      return;
+    }
+    $user_message = $c->show_user_by_id($weibo_uid);
+    $account_wrapper = entity_metadata_wrapper('user', $account);
+    $account_wrapper->field_swb_bind->set(1);
+    $account_wrapper->field_swb_name->set($user_message['name']);
+    $account_wrapper->field_swb_uid->set($weibo_uid);
+    $account_wrapper->field_swb_oauth_token->set($_SESSION['weibooauth_token']['access_token']);
+    $account_wrapper->save();
+  }
+}
